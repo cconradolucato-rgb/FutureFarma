@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.log
+private/
+server_config.json
+*secret*

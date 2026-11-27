@@ -7,17 +7,19 @@ def build(destination):
  dest=Path(destination).resolve()
  if dest==REPO or REPO in dest.parents:raise ValueError('Instalador contem chave de leitura; destino deve ficar fora do repositorio publico.')
  dest.mkdir(parents=True,exist_ok=True)
- for name in ('updater.py','restart_panel.ps1','install.ps1'):shutil.copy2(REPO/'autoupdate'/name,dest/name)
+ for name in ('updater.py','restart_panel.ps1','install.ps1','recover_config.py'):shutil.copy2(REPO/'autoupdate'/name,dest/name)
  k=keys();config=dest/'update_channel.json';config.write_text(json.dumps({n:k[n] for n in ('public_key','decrypt_key')},indent=2));config.chmod(0o600)
  (dest/'INSTALAR.bat').write_text('@echo off\ncd /d "%~dp0"\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1"\npause\n',encoding='ascii')
- (dest/'LEIA_PRIMEIRO.txt').write_text('''INSTALADOR CORRIGIDO 2026.11.27.2
+ (dest/'LEIA_PRIMEIRO.txt').write_text('''INSTALADOR COM RECUPERACAO 2026.11.27.3
 1. Dentro da Area de Trabalho Remota do servidor 192.168.0.32, extraia TODO este
    pacote em Downloads\\AtualizadorFutureFarma. Nao e preciso copiar para a pasta do painel.
 2. Execute INSTALAR.bat e aceite a janela de administrador.
 3. Selecione a pasta PRINCIPAL FutureFarma_Servidor com server.py, config.json,
    static, data e .venv. Nao selecione a pasta do chat AvisosFutura.
-4. Aguarde INSTALACAO CONCLUIDA. O painel e atualizado na primeira execucao.
-5. No navegador, Ctrl+F5; confirme Comissao: regra 27/11 ativa.
+4. Se identificar o config do pacote antigo, recupera automaticamente o modo SQL local,
+   procurando primeiro uma copia valida e guardando backup do arquivo substituido.
+5. Aguarde INSTALACAO CONCLUIDA. O painel e atualizado na primeira execucao.
+6. No navegador, Ctrl+F5; confirme Comissao: regra 27/11 ativa.
 
 Verifica novas versoes assinadas a cada 2 minutos, com backup e restauracao.
 Nenhuma configuracao de senha, meta, taxa ou data/* e substituida.
@@ -33,7 +35,7 @@ Historico de erros: automatic_updates\\updater.log e last_error.txt.
 Este pacote e privado e contem a chave de leitura do canal. Guarde-o na empresa.
 Para pausar: desative FutureFarma-Atualizacao-Automatica no Agendador de Tarefas.
 ''',encoding='utf-8')
- expected={'updater.py','restart_panel.ps1','install.ps1','update_channel.json','INSTALAR.bat','LEIA_PRIMEIRO.txt'}
+ expected={'updater.py','restart_panel.ps1','install.ps1','recover_config.py','update_channel.json','INSTALAR.bat','LEIA_PRIMEIRO.txt'}
  zip_path=dest.parent/(dest.name+'.zip')
  with zipfile.ZipFile(zip_path,'w',zipfile.ZIP_DEFLATED) as z:
   for name in sorted(expected):z.write(dest/name,name)

@@ -5,7 +5,7 @@ if(-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrat
  exit
 }
 $logPath=Join-Path $PSScriptRoot 'instalacao.log'
-Set-Content -LiteralPath $logPath -Value ('Instalador 2026.11.27.2 - '+(Get-Date -Format o)) -Encoding UTF8
+Set-Content -LiteralPath $logPath -Value ('Instalador 2026.11.27.3 - '+(Get-Date -Format o)) -Encoding UTF8
 function Invoke-PythonCaptured {
  param([string]$Executable,[string[]]$Arguments,[int]$TimeoutMs=300000)
  $info=New-Object System.Diagnostics.ProcessStartInfo
@@ -46,8 +46,14 @@ try{
   if(-not(Test-Path -LiteralPath (Join-Path $root $file))){throw "Pasta incorreta ou incompleta; arquivo ausente: $file"}
  }
  $panelConfig=Get-Content -LiteralPath (Join-Path $root 'config.json') -Raw | ConvertFrom-Json
- if($panelConfig.public_key -and $panelConfig.decrypt_key -and -not $panelConfig.sql_server){throw 'O config.json desta pasta e do pacote antigo, nao do painel. Restaure o config.json original do painel antes de prosseguir; nenhum dado foi apagado pelo instalador.'}
  $python=Join-Path $root '.venv\Scripts\python.exe'
+ if($panelConfig.public_key -and $panelConfig.decrypt_key -and -not $panelConfig.sql_server){
+  Write-Host 'Recuperando a configuracao do painel substituida pelo pacote antigo...'
+  $recovery=Invoke-PythonCaptured -Executable $python -Arguments @((Join-Path $PSScriptRoot 'recover_config.py'),$root)
+  Write-Host $recovery.Output
+  if($recovery.ExitCode -ne 0){throw 'Nao foi possivel recuperar a configuracao automaticamente; veja instalacao.log. Nenhum dado comercial foi alterado.'}
+ }
+
  $versionProbe=Invoke-PythonCaptured -Executable $python -Arguments @('-c','import sys;print(sys.version);sys.exit(0 if sys.version_info>=(3,8) else 1)')
  if($versionProbe.ExitCode -ne 0){throw 'Python 3.8 ou superior necessario; veja instalacao.log.'}
  $probeCode='import cryptography; from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey; from cryptography.hazmat.primitives.ciphers.aead import AESGCM'

@@ -2,7 +2,7 @@
 
 Este repositório hospeda o cliente genérico de atualização e releases **criptografados e assinados** do painel comercial. Não contém configurações, senhas, registros de vendas ou históricos da empresa.
 
-O servidor verifica `releases/stable.json` a cada dois minutos. A instalação inicial fixa a chave pública de assinatura e mantém a chave de decifragem somente no servidor autorizado. Alterar este repositório não autoriza um pacote sem assinatura válida.
+O servidor verifica `releases/stable.json` a cada minuto. A instalação inicial fixa a chave pública de assinatura e mantém a chave de decifragem somente no servidor autorizado. Alterar este repositório não autoriza um pacote sem assinatura válida.
 
 O atualizador preserva `config.json`, a pasta `data` e as configurações editadas pelo dashboard. Antes de instalar, faz backup dos arquivos afetados; se as verificações falharem, restaura a versão anterior.
 

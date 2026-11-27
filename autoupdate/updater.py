@@ -1,10 +1,12 @@
 """Cliente de atualizacao: somente releases cifrados e assinados da origem fixada."""
 from pathlib import Path,PurePosixPath
-import base64,hashlib,io,json,os,subprocess,sys,time,urllib.request,zipfile,shutil,contextlib,logging
+import base64,hashlib,io,json,os,re,subprocess,sys,time,urllib.request,zipfile,shutil,contextlib,logging
 from datetime import datetime,timezone
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-BASE='https://raw.githubusercontent.com/cconradolucato-rgb/FutureFarma/main/'
+CLIENT_BUILD=2026112705
+REPO_RAW='https://raw.githubusercontent.com/cconradolucato-rgb/FutureFarma/'
+BASE=REPO_RAW+'main/'
 ALLOWED={'career_engine.py','career_qualification.py','encapsulation.py','google_production_sync.py','reader.py','history_reference.py','goal_engine.py','purchase_planning.py','inventory_connection.py','inventory_projection.py','recovery_engine.py','forecast_engine.py','performance_flags.py','order_details.py','business_insights.py','google_reviews.py','server.py','core.py','settings_encoding.py','purchase_store.py','operations_store.py','google_reviews_config.py'}
 REQUIRED_VERSION='2026-11-27-dashboard-bonus'
 def canonical(value):return json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()
@@ -35,12 +37,35 @@ def decode_release(envelope,ciphertext,config,current=0):
 
 def download(relative,limit):
  if relative.startswith('/') or '..' in relative.split('/') or ':' in relative or '\\' in relative:raise ValueError('Origem do pacote invalida')
- req=urllib.request.Request(BASE+relative,headers={'User-Agent':'FutureFarma-Updater/1'})
+ url=BASE+relative+('?ff='+str(int(time.time())) if relative=='releases/stable.json' else '')
+ req=urllib.request.Request(url,headers={'User-Agent':'FutureFarma-Updater/1','Cache-Control':'no-cache'})
  with urllib.request.urlopen(req,timeout=30) as r:
   if not r.url.startswith(BASE):raise ValueError('Redirecionamento fora da origem autorizada')
   data=r.read(limit+1)
   if len(data)>limit:raise ValueError('Resposta grande demais')
   return data
+
+def latest_revision():
+ # A referencia Git e consultada primeiro para evitar cache do arquivo em main.
+ url='https://github.com/cconradolucato-rgb/FutureFarma.git/info/refs?service=git-upload-pack'
+ req=urllib.request.Request(url,headers={'User-Agent':'git/FutureFarma-Updater','Cache-Control':'no-cache'})
+ with urllib.request.urlopen(req,timeout=30) as r:
+  if not r.url.startswith('https://github.com/cconradolucato-rgb/FutureFarma.git/'):raise ValueError('Origem Git invalida')
+  raw=r.read(500001)
+ if len(raw)>500000:raise ValueError('Resposta Git grande demais')
+ match=re.search(rb'([0-9a-f]{40}) refs/heads/main(?:\x00|\n)',raw)
+ if not match:raise ValueError('Referencia main nao encontrada')
+ return match.group(1).decode('ascii')
+
+def download_revision(revision,relative,limit):
+ if not re.fullmatch('[0-9a-f]{40}',revision):raise ValueError('Revisao Git invalida')
+ if relative.startswith('/') or '..' in relative.split('/') or ':' in relative or '\\' in relative:raise ValueError('Arquivo remoto invalido')
+ url=REPO_RAW+revision+'/'+relative
+ with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'FutureFarma-Updater/2'}),timeout=30) as r:
+  if not r.url.startswith(REPO_RAW+revision+'/'):raise ValueError('Redirecionamento fora da revisao autorizada')
+  data=r.read(limit+1)
+ if len(data)>limit:raise ValueError('Resposta grande demais')
+ return data
 
 def write_atomic(path,content):
  path.parent.mkdir(parents=True,exist_ok=True);tmp=path.with_name(path.name+'.update-tmp');tmp.write_bytes(content);tmp.replace(path)
@@ -112,11 +137,17 @@ class Updater:
   write_atomic(self.state_path,json.dumps(self.state,indent=2).encode());self.status(result='updated');self.cleanup()
  def run(self):
   # O manifesto e validado antes de confiar na versao ou origem do payload.
-  e=json.loads(download('releases/stable.json',150000));m=e['manifest']
+  try:
+   revision=latest_revision()
+  except Exception:
+   logging.warning('Consulta Git indisponivel; usando manifesto assinado pelo endereco alternativo')
+   revision=None
+  fetch=(lambda path,limit:download_revision(revision,path,limit)) if revision else download
+  e=json.loads(fetch('releases/stable.json',150000));m=e['manifest']
   Ed25519PublicKey.from_public_bytes(bytes.fromhex(self.config['public_key'])).verify(base64.b64decode(e['signature'],validate=True),canonical(m))
   if m['build']<=self.state.get('build',0):self.status(result='up_to_date');self.cleanup();return
   if m['build']==self.read_failed_build():self.status(result='failed_build_waiting_for_new_version');return
-  raw=download(m['payload'],16000000);m,files=decode_release(e,raw,self.config,self.state.get('build',0))
+  raw=fetch(m['payload'],16000000);m,files=decode_release(e,raw,self.config,self.state.get('build',0))
   try:self.apply(m,files)
   except Exception:
    write_atomic(self.home/'failed_build.json',json.dumps({'build':m['build']}).encode());raise

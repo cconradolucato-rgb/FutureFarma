@@ -79,7 +79,7 @@ try{
  & icacls $updateDir '/inheritance:r' '/grant:r' "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
  if($LASTEXITCODE -ne 0){throw 'Nao foi possivel proteger os arquivos do atualizador.'}
  $action=New-ScheduledTaskAction -Execute $python -Argument ('"'+(Join-Path $updateDir 'updater.py')+'" "'+$root+'"') -WorkingDirectory $root
- $trigger=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2) -RepetitionInterval (New-TimeSpan -Minutes 2)
+ $trigger=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
  $principal=New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Highest
  $settings=New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
  $taskName='FutureFarma-Atualizacao-Automatica'
@@ -92,7 +92,7 @@ try{
   if(Test-Path -LiteralPath $errorFile){Write-Host (Get-Content -LiteralPath $errorFile -Raw)}
   throw "A tarefa foi criada, mas a primeira verificacao falhou. Consulte $updateDir\last_error.txt e updater.log"
  }
- Write-Host 'INSTALACAO CONCLUIDA. Atualizacoes verificadas a cada 2 minutos.' -ForegroundColor Green
+ Write-Host 'INSTALACAO CONCLUIDA. Atualizacoes verificadas a cada 1 minuto.' -ForegroundColor Green
  Write-Host 'Mantenha esta conta do Windows conectada; pode desconectar o RDP sem encerrar a sessao.'
  Write-Host 'No navegador: Ctrl+F5. Confirme Comissao: regra 27/11 ativa.'
  Write-Host "Status: $updateDir\status.json"

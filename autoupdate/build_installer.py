@@ -21,7 +21,7 @@ def build(destination):
 5. Aguarde INSTALACAO CONCLUIDA. O painel e atualizado na primeira execucao.
 6. No navegador, Ctrl+F5; confirme Comissao: regra 27/11 ativa.
 
-Verifica novas versoes assinadas a cada 2 minutos, com backup e restauracao.
+Verifica novas versoes assinadas a cada 1 minuto, com backup e restauracao.
 Nenhuma configuracao de senha, meta, taxa ou data/* e substituida.
 O arquivo update_channel.json configura SOMENTE o atualizador. Nao e o config do painel.
 Mantenha a conta do Windows com sessao iniciada; pode desconectar o RDP.

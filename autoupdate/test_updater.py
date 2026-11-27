@@ -1,6 +1,6 @@
 import copy,io,json,tempfile,unittest,zipfile,os,base64,hashlib
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock,patch
 from updater import *
 class Tests(unittest.TestCase):
  def setUp(self):
@@ -11,7 +11,7 @@ class Tests(unittest.TestCase):
   files=files or {'career_engine.py':b'x=42\n'};raw=io.BytesIO()
   with zipfile.ZipFile(raw,'w') as z:
    for n,b in files.items():z.writestr(n,b)
-  nonce=os.urandom(12);m={'schema':1,'product':'futurefarma-commercial','build':2,'version':'test','files':{n:hashlib.sha256(b).hexdigest() for n,b in files.items()}}
+  nonce=os.urandom(12);m={'schema':1,'product':'futurefarma-commercial','build':2,'version':'test','payload':'releases/2.bin','files':{n:hashlib.sha256(b).hexdigest() for n,b in files.items()}}
   cipher=AESGCM(bytes.fromhex(self.config['decrypt_key'])).encrypt(nonce,raw.getvalue(),canonical({'build':2,'product':m['product']}));m.update(nonce=base64.b64encode(nonce).decode(),cipher_sha256=hashlib.sha256(cipher).hexdigest())
   return {'manifest':m,'signature':base64.b64encode(self.key.sign(canonical(m))).decode()},cipher
  def test_valid(self):
@@ -60,6 +60,19 @@ class Tests(unittest.TestCase):
     p=folders/str(i);p.mkdir();(p/'keep').touch();os.utime(p,(i,i))
    unknown=u.root/'backup_manual';unknown.mkdir();(unknown/'historic').touch()
    u.cleanup();self.assertFalse(old.exists());self.assertEqual(len(list(folders.iterdir())),5);self.assertTrue((unknown/'historic').exists());self.assertEqual((u.root/'data/settings.json').read_text(),'settings unchanged')
+ def test_revision_reference_parsing(self):
+  response=Mock();response.url='https://github.com/cconradolucato-rgb/FutureFarma.git/info/refs?service=git-upload-pack';response.read.return_value=b'0040'+b'a'*40+b' refs/heads/main\n';response.__enter__=Mock(return_value=response);response.__exit__=Mock(return_value=False)
+  with patch('updater.urllib.request.urlopen',return_value=response):self.assertEqual(latest_revision(),'a'*40)
+ def test_manifest_by_immutable_revision(self):
+  with tempfile.TemporaryDirectory() as d:
+   u=self.fixture(d);u.config=self.config;u.apply=Mock();e,c=self.package()
+   with patch('updater.latest_revision',return_value='a'*40),patch('updater.download_revision',side_effect=[json.dumps(e).encode(),c]) as fetch,patch('updater.download') as old:
+    u.run();self.assertEqual(fetch.call_count,2);self.assertEqual(fetch.call_args_list[0].args[0],'a'*40);self.assertFalse(old.called);self.assertTrue(u.apply.called)
+ def test_signed_fallback_if_git_unavailable(self):
+  with tempfile.TemporaryDirectory() as d:
+   u=self.fixture(d);u.config=self.config;u.apply=Mock();e,c=self.package()
+   with patch('updater.latest_revision',side_effect=OSError('blocked')),patch('updater.download',side_effect=[json.dumps(e).encode(),c]) as fetch:
+    u.run();self.assertEqual(fetch.call_count,2);self.assertTrue(u.apply.called)
  def test_html_idempotent(self):
   b=integrate_html(b'<body></body>',2);c=integrate_html(b,3);self.assertEqual(c.count(b'career_losses.js'),1);self.assertEqual(c.count(b'commission_percent.js'),1)
 if __name__=='__main__':unittest.main()
